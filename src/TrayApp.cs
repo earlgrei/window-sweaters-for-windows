@@ -55,7 +55,7 @@ internal sealed class TrayApp : ApplicationContext
     internal string MenuSelfTest()
     {
         BuildMenu();
-        var groups = new[] { "Pattern", "Border Width", "Stitch Size" };
+        var groups = new[] { "Season", "Pattern", "Border Width", "Stitch Size" };
         int clicks = 0;
         foreach (var group in groups)
         {
@@ -71,6 +71,8 @@ internal sealed class TrayApp : ApplicationContext
         }
         BuildMenu();
         Find("Pattern").DropDownItems.OfType<ToolStripMenuItem>().First(i => i.Text == "By App").PerformClick();
+        BuildMenu();
+        Find("Season").DropDownItems.OfType<ToolStripMenuItem>().First(i => i.Text == "Winter Sweaters").PerformClick();
         BuildMenu();
         var sb = new System.Text.StringBuilder($"clicked {clicks} items\n");
         void Dump(ToolStripItemCollection items, string indent)
@@ -132,6 +134,9 @@ internal sealed class TrayApp : ApplicationContext
         Apps.OnByDefault = S.AppsOnByDefault;
         Apps.Exceptions.Clear();
         Apps.Exceptions.AddRange(S.AppExceptions);
+        Seasons.FollowCalendar = S.FollowCalendar;
+        Seasons.Chosen = Seasons.Parse(S.Season);
+        Seasons.Twinkle = S.Twinkle;
     }
 
     void Changed()
@@ -210,6 +215,26 @@ internal sealed class TrayApp : ApplicationContext
         _menu.ImageScalingSize = new Size(sw, sh);
 
         items.Add(Item("Show Sweater Borders", S.On, () => { S.On = !S.On; Changed(); }));
+
+        // Season
+        var season = Submenu(items, "Season");
+        var nowSeason = Seasons.Current;
+        season.DropDownItems.Add(Item("Follow the Calendar", S.FollowCalendar, () => { S.FollowCalendar = !S.FollowCalendar; Changed(); },
+            tip: "Flower rings March to May, inner tubes June to August, twigs and vines September to November, " +
+                 "a twinkling garland in December, and sweaters in January and February."));
+        season.DropDownItems.Add(new ToolStripSeparator());
+        foreach (var (kind, key, title, months) in Seasons.All)
+        {
+            bool on = S.FollowCalendar ? nowSeason == kind : Seasons.Chosen == kind;
+            string label = S.FollowCalendar && on ? title + "  (now)" : title;
+            season.DropDownItems.Add(Item(label, on, () => { S.FollowCalendar = false; S.Season = key; Changed(); },
+                tip: "Worn " + months + " when following the calendar.", image: SeasonSwatch(kind, sw, sh)));
+        }
+        season.DropDownItems.Add(new ToolStripSeparator());
+        var twinkle = Item("Twinkling Lights", S.Twinkle, () => { S.Twinkle = !S.Twinkle; Changed(); },
+            tip: "Animate the holiday garland's lights.");
+        twinkle.Enabled = nowSeason == Season.Holiday;
+        season.DropDownItems.Add(twinkle);
 
         // Apps
         var apps = Submenu(items, "Apps");
@@ -320,6 +345,22 @@ internal sealed class TrayApp : ApplicationContext
 
         items.Add(new ToolStripSeparator());
         items.Add(Item("Quit Window Sweaters", false, Quit));
+    }
+
+    static Image? SeasonSwatch(Season season, int w, int h)
+    {
+        try
+        {
+            return season switch
+            {
+                Season.Winter => Knit.Swatch(0xffc46a4eu, Charts.Find("atelier-claude"), w, h),
+                Season.Spring => RingPainter.Swatch(season, 0xffe07a8au, w, h),
+                Season.Summer => RingPainter.Swatch(season, 0xff2f8fd8u, w, h),
+                Season.Fall => RingPainter.Swatch(season, 0xffa6402eu, w, h),
+                _ => RingPainter.Swatch(season, 0xffc46a4eu, w, h),
+            };
+        }
+        catch { return null; }
     }
 
     static Image? SafeSwatch(uint color, Chart? chart, int w, int h, Stitch? stitch = null)

@@ -52,6 +52,17 @@ internal sealed class Strip : NativeWindow, IDisposable
         UpdateLayeredWindow(Handle, IntPtr.Zero, ref dst, ref size, _dc, ref src, 0, ref blend, ULW_ALPHA);
     }
 
+    /// Re-upload the pixels in place (for animation), without moving the window.
+    public void Refresh()
+    {
+        if (_dc == IntPtr.Zero) return;
+        GdiFlush();
+        var size = new SIZE(_w, _h);
+        var src = new POINT(0, 0);
+        var blend = new BLENDFUNCTION { BlendOp = AC_SRC_OVER, SourceConstantAlpha = 255, AlphaFormat = AC_SRC_ALPHA };
+        UpdateLayeredWindow(Handle, IntPtr.Zero, IntPtr.Zero, ref size, _dc, ref src, 0, ref blend, ULW_ALPHA);
+    }
+
     public void Show(IntPtr after)
     {
         SetWindowPos(Handle, after, 0, 0, 0, 0,
@@ -97,6 +108,13 @@ internal sealed class Sweater : IDisposable
     uint _yarn;
     int _chartId = int.MinValue;
     public bool Shown { get; private set; }
+
+    // Seasonal decorations; the base (everything but the bulbs) is kept per strip for twinkling.
+    DecorLayout? _decor;
+    readonly uint[]?[] _base = new uint[4][];
+    int[] _levels = [];
+
+    public static double Now => Environment.TickCount64 / 1000.0;
 
     public Sweater(IntPtr target, AppIdentity app)
     {
@@ -184,23 +202,30 @@ internal sealed class Sweater : IDisposable
             new Rectangle(0, t, t, oh - 2 * t),         // left
             new Rectangle(ow - t, t, t, oh - 2 * t),    // right
         };
-        var win = new RectangleF(band, band, ow - 2 * band, oh - 2 * band);
-        float orad = radius + band;
+
+        var season = Seasons.Current;
+        var decor = season == Season.Winter ? null : Decor.Build(season, new Ring(ow, oh, radius + band), yarn, band, tuck);
+        bool lights = decor is { Bulbs.Count: > 0 };
+        double now = Now;
+        _decor = decor;
+        _levels = lights ? decor!.Bulbs.Select(b => Decor.Level(b, now)).ToArray() : [];
 
         for (int i = 0; i < 4; i++)
         {
             var r = rects[i];
             var strip = _strips[i];
-            if (r.Width <= 0 || r.Height <= 0) { strip.Hide(); strip.Size = Size.Empty; continue; }
-            IntPtr bits = strip.Bits(r.Width, r.Height);
-            using (var bmp = new Bitmap(r.Width, r.Height, r.Width * 4, PixelFormat.Format32bppPArgb, bits))
-            using (var g = Graphics.FromImage(bmp))
+            if (r.Width <= 0 || r.Height <= 0) { strip.Hide(); strip.Size = Size.Empty; _base[i] = null; continue; }
+            uint* bits = (uint*)strip.Bits(r.Width, r.Height);
+            RingPainter.Paint(bits, r, ow, oh, band, tuck, radius, yarn, chart, decor);
+            if (lights)
             {
-                g.Clear(Color.Transparent);
-                g.TranslateTransform(-r.X, -r.Y);
-                Knit.DrawRing(g, win, radius, band, yarn, chart, tuck);
+                int n = r.Width * r.Height;
+                var copy = _base[i] is { } b && b.Length == n ? b : new uint[n];
+                fixed (uint* dst = copy) Buffer.MemoryCopy(bits, dst, n * 4L, n * 4L);
+                _base[i] = copy;
+                RingPainter.Bulbs(bits, r, decor!, now);
             }
-            Mask((uint*)bits, r, ow, oh, orad);
+            else _base[i] = null;
             strip.Offset = r.Location;
             strip.Size = r.Size;
             strip.Present(outer.X + r.X, outer.Y + r.Y);
@@ -212,27 +237,32 @@ internal sealed class Sweater : IDisposable
         }
     }
 
-    // Anti-aliased outer rounded edge: coverage from the rounded rect's signed distance.
-    static unsafe void Mask(uint* p, Rectangle r, int ow, int oh, float rad)
+    /// Advance the holiday lights: only strips with a bulb whose brightness changed are redrawn,
+    /// from the cached base, and re-uploaded in place.
+    public unsafe void Twinkle(double now)
     {
-        float cx = ow * 0.5f, cy = oh * 0.5f, hx = cx - rad, hy = cy - rad;
-        for (int y = 0; y < r.Height; y++)
+        if (!Shown || _decor is not { Bulbs.Count: > 0 } decor || _levels.Length != decor.Bulbs.Count) return;
+        Span<bool> dirty = stackalloc bool[4];
+        for (int k = 0; k < decor.Bulbs.Count; k++)
         {
-            float qy = MathF.Abs(r.Y + y + 0.5f - cy) - hy;
-            for (int x = 0; x < r.Width; x++)
-            {
-                float qx = MathF.Abs(r.X + x + 0.5f - cx) - hx;
-                float ox = MathF.Max(qx, 0f), oy = MathF.Max(qy, 0f);
-                float dist = MathF.Sqrt(ox * ox + oy * oy) + MathF.Min(MathF.Max(qx, qy), 0f) - rad;
-                float a = 0.5f - dist;
-                if (a >= 1f) continue;
-                uint* px = p + y * r.Width + x;
-                if (a <= 0f) { *px = 0; continue; }
-                uint v = *px;
-                uint A = (uint)(((v >> 24) & 255) * a), R = (uint)(((v >> 16) & 255) * a);
-                uint G = (uint)(((v >> 8) & 255) * a), B = (uint)((v & 255) * a);
-                *px = (A << 24) | (R << 16) | (G << 8) | B;
-            }
+            var b = decor.Bulbs[k];
+            int level = Decor.Level(b, now);
+            if (level == _levels[k]) continue;
+            _levels[k] = level;
+            for (int i = 0; i < 4; i++)
+                if (!dirty[i] && b.Bounds.IntersectsWith(new Rectangle(_strips[i].Offset, _strips[i].Size))) dirty[i] = true;
+        }
+        for (int i = 0; i < 4; i++)
+        {
+            var strip = _strips[i];
+            if (!dirty[i] || !strip.Visible || _base[i] is not { } baseCopy) continue;
+            var r = new Rectangle(strip.Offset, strip.Size);
+            uint* bits = (uint*)strip.Bits(r.Width, r.Height);
+            int n = r.Width * r.Height;
+            if (baseCopy.Length != n) continue;
+            fixed (uint* src = baseCopy) Buffer.MemoryCopy(src, bits, n * 4L, n * 4L);
+            RingPainter.Bulbs(bits, r, decor, now);
+            strip.Refresh();
         }
     }
 

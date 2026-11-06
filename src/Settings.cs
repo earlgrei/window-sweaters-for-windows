@@ -16,6 +16,9 @@ internal sealed class Settings
     public int Anchor { get; set; }
     public bool AppsOnByDefault { get; set; } = true;
     public List<string> AppExceptions { get; set; } = [];
+    public string Season { get; set; } = "winter";
+    public bool FollowCalendar { get; set; }
+    public bool Twinkle { get; set; } = true;
 
     public static string Dir
     {

@@ -26,6 +26,8 @@ No admin rights or accessibility permission are needed.
 Click the yarn ball (left or right click) for the menu:
 
 - **Show Sweater Borders** — pause or resume every sweater.
+- **Season** — what your windows wear (see below), or **Follow the Calendar** to change with the
+  months. **Twinkling Lights** animates the holiday garland.
 - **Apps** — untick an app to leave it bare. **Turn Off for All Apps**, then tick a few, to
   sweater only the ones you like; apps you open later start off too. Choices survive a restart.
 - **Pattern** — **By App** gives each app its own sweater. **Stockinette** and **Rib** are plain
@@ -35,6 +37,25 @@ Click the yarn ball (left or right click) for the menu:
 - **Border Width** and **Stitch Size** — from Slim to Extra Wide, Chunky to Very Fine.
 - **Your Colourways** — open the settings folder, edit `apps.conf`, reload.
 - **Start with Windows** — adds or removes a per-user startup entry.
+
+## Seasons
+
+Sweaters are for winter. The rest of the year your windows can dress for the weather:
+
+![The corner of a window in each season: a knitted sweater, a vine of spring flowers, a striped summer inner tube, autumn twigs and leaves, and a pine garland with coloured lights](docs/seasons.png)
+
+| Season | Outfit | With Follow the Calendar |
+|---|---|---|
+| Winter Sweaters | the knitted collection below | January and February |
+| Spring Flower Rings | a leafy vine with daisies, pastels and flowers in the app's colour | March to May |
+| Summer Inner Tubes | a glossy pool ring striped in the app's colour | June to August |
+| Fall Twigs & Vines | twisted twigs, autumn leaves and berries in the app's colour | September to November |
+| Holiday Garland | pine garland with C9 lights that slowly twinkle | December |
+
+Every season keeps each app's own colour, so your `apps.conf` colourways carry through the year.
+Winter is the default; **Follow the Calendar** is opt-in. The decorations show more detail at
+**Border Width → Wide** or wider. The twinkling garland redraws only its lights, five times a second,
+and uses about 2% of one CPU core; turn off **Twinkling Lights** for a still garland.
 
 ## The sweaters
 
@@ -79,6 +100,9 @@ side) placed directly beneath it in z-order. They reach a little way *under* the
 "tuck" — so the knit never shows a gap while you drag. Window moves are followed through
 WinEvent hooks; a move just repositions the strips, a resize redraws them from cached knit tiles.
 Visible frame bounds and corner rounding come from DWM, and sizes follow each monitor's DPI.
+Seasonal decorations are placed by arc length around the rounded ring, so they follow the corners;
+they're drawn from cached sprites, and the garland keeps a copy of everything but its lights so a
+twinkle only re-blits the bulbs.
 
 Windows go without a sweater while maximized, full screen, minimized or on another virtual desktop.
 
@@ -92,7 +116,7 @@ Windows go without a sweater while maximized, full screen, minimized or on anoth
 ## Developer aids
 
 ```powershell
-WindowSweaters.exe --swatch out.png [scale]   # render sample sweaters to a PNG
+WindowSweaters.exe --swatch out.png [scale] [season] [seconds]   # render samples to a PNG
 WindowSweaters.exe --menu-test out.txt        # click through every menu style, dump the menu
 WindowSweaters.exe --write-icon app.ico       # regenerate the icon
 ```

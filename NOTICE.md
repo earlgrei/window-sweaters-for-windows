@@ -26,3 +26,6 @@ Notepad and the Office executables.
 
 Application names in the collection belong to their respective owners and are used to
 describe colourway inspiration. No affiliation or endorsement is implied.
+
+The seasonal outfits (flower rings, inner tubes, twigs and vines, holiday garland) are new in
+this port and are not part of the macOS app.

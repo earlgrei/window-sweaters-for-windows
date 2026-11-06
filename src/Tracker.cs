@@ -14,6 +14,8 @@ internal sealed class Tracker : IDisposable
     readonly WinEventDelegate _proc;
     readonly Timer _reconcile = new() { Interval = 1000 };
     readonly Timer _restack = new() { Interval = 60 };
+    readonly Timer _twinkle = new() { Interval = 200 };
+    Season _season = Seasons.Current;
     readonly uint _ownPid = (uint)Environment.ProcessId;
 
     static readonly HashSet<string> s_skipClasses =
@@ -29,6 +31,19 @@ internal sealed class Tracker : IDisposable
         _proc = OnEvent;
         _reconcile.Tick += (_, _) => Reconcile();
         _restack.Tick += (_, _) => { _restack.Stop(); RestackAll(); };
+        _twinkle.Tick += (_, _) =>
+        {
+            double now = Sweater.Now;
+            foreach (var s in _sweaters.Values) s.Twinkle(now);
+        };
+    }
+
+    /// Run the holiday lights only while they are showing and twinkling.
+    void UpdateAnimation()
+    {
+        bool on = _hooks.Count > 0 && Program.Settings.On && Seasons.Animated;
+        if (on && !_twinkle.Enabled) _twinkle.Start();
+        else if (!on && _twinkle.Enabled) _twinkle.Stop();
     }
 
     public void Start()
@@ -41,6 +56,7 @@ internal sealed class Tracker : IDisposable
         Hook(EVENT_OBJECT_CLOAKED, EVENT_OBJECT_UNCLOAKED);
         Reconcile();
         _reconcile.Start();
+        UpdateAnimation();
     }
 
     void Hook(uint min, uint max)
@@ -148,6 +164,9 @@ internal sealed class Tracker : IDisposable
     /// Enumerate every top-level window: pick up anything the hooks missed, drop the dead.
     public void Reconcile()
     {
+        // Following the calendar: change outfits when the season turns.
+        if (Seasons.Current != _season) { RefreshAll(); return; }
+
         var seen = new HashSet<IntPtr>();
         EnumWindows((h, _) => { seen.Add(h); return true; }, IntPtr.Zero);
         foreach (var dead in _sweaters.Keys.Where(k => !seen.Contains(k) || !IsWindow(k)).ToList()) Drop(dead);
@@ -167,7 +186,9 @@ internal sealed class Tracker : IDisposable
     /// Settings changed: redraw every sweater.
     public void RefreshAll()
     {
+        _season = Seasons.Current;
         StyleVersion++;
+        UpdateAnimation();
         foreach (var s in _sweaters.Values) Refresh(s, force: true);
         RestackAll();
     }
@@ -183,6 +204,7 @@ internal sealed class Tracker : IDisposable
     {
         _reconcile.Stop();
         _restack.Stop();
+        _twinkle.Stop();
         foreach (var h in _hooks) UnhookWinEvent(h);
         _hooks.Clear();
         foreach (var s in _sweaters.Values) s.Dispose();

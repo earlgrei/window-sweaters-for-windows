@@ -20,7 +20,7 @@ internal static class Program
         if (args is ["--swatch", var outPath, ..])
         {
             // Developer aid: render a sample sweater to a PNG (see README).
-            Preview.Render(outPath, args.Length > 2 ? args[2] : null);
+            Preview.Render(outPath, args.Length > 2 ? args[2] : null, args.Length > 3 ? args[3] : null, args.Length > 4 ? args[4] : null);
             return 0;
         }
 

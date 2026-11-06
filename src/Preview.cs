@@ -3,15 +3,20 @@ using System.Drawing.Imaging;
 
 namespace WindowSweaters;
 
-/// Renders a sheet of sample sweaters to a PNG, without touching any real window.
-/// `WindowSweaters.exe --swatch out.png [scale]`
+/// Renders a sheet of sample borders to a PNG, without touching any real window.
+/// `WindowSweaters.exe --swatch out.png [scale] [winter|spring|summer|fall|holiday] [seconds]`
 internal static class Preview
 {
-    public static void Render(string path, string? scaleArg)
+    public static unsafe void Render(string path, string? scaleArg, string? seasonArg = null, string? timeArg = null)
     {
-        float scale = float.TryParse(scaleArg, System.Globalization.CultureInfo.InvariantCulture, out var s) ? s : 2f;
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        float scale = float.TryParse(scaleArg, inv, out var s) ? s : 2f;
+        double time = double.TryParse(timeArg, inv, out var t) ? t : 0;
         Charts.Load(Settings.ChartsDir);
         Apps.Load(Settings.AppsConfPath);
+        Seasons.FollowCalendar = false;
+        Seasons.Chosen = Seasons.Parse(seasonArg);
+        var season = Seasons.Current;
 
         var samples = new (string Label, Func<(uint, Chart?)> Look)[]
         {
@@ -33,7 +38,8 @@ internal static class Preview
         int band = (int)MathF.Round(12 * scale), tuck = (int)MathF.Round(14 * scale);
         float radius = 8 * scale;
         int ww = (int)(300 * scale), wh = (int)(170 * scale), gap = (int)(36 * scale);
-        int cellW = ww + 2 * band + gap, cellH = wh + 2 * band + gap + (int)(18 * scale);
+        int ow = ww + 2 * band, oh = wh + 2 * band;
+        int cellW = ow + gap, cellH = oh + gap + (int)(18 * scale);
 
         using var sheet = new Bitmap(cols * cellW + gap, rows * cellH + gap, PixelFormat.Format32bppPArgb);
         using var g = Graphics.FromImage(sheet);
@@ -45,26 +51,20 @@ internal static class Preview
             var (label, look) = samples[i];
             var (yarn, chart) = look();
             int x = gap + (i % cols) * cellW, y = gap + (i / cols) * cellH;
-            var outer = new Rectangle(x, y, ww + 2 * band, wh + 2 * band);
-            using (var ring = new Bitmap(outer.Width, outer.Height, PixelFormat.Format32bppPArgb))
+            using (var ring = new Bitmap(ow, oh, PixelFormat.Format32bppPArgb))
             {
-                using (var rg = Graphics.FromImage(ring))
-                    Knit.DrawRing(rg, new RectangleF(band, band, ww, wh), radius, band, yarn, chart, tuck);
-                // the same rounded mask the strips use
-                using var mask = Knit.RoundedRect(new RectangleF(0, 0, outer.Width, outer.Height), radius + band);
-                var state = g.Save();
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                using var tb = new TextureBrush(ring, WrapMode.Clamp);
-                tb.TranslateTransform(outer.X, outer.Y);
-                g.TranslateTransform(outer.X, outer.Y);
-                tb.TranslateTransform(-outer.X, -outer.Y);
-                g.FillPath(tb, mask);
-                g.Restore(state);
+                var data = ring.LockBits(new Rectangle(0, 0, ow, oh), ImageLockMode.ReadWrite, PixelFormat.Format32bppPArgb);
+                var full = new Rectangle(0, 0, ow, oh);
+                var decor = season == Season.Winter ? null : Decor.Build(season, new Ring(ow, oh, radius + band), yarn, band, tuck);
+                RingPainter.Paint((uint*)data.Scan0, full, ow, oh, band, tuck, radius, yarn, chart, decor);
+                if (decor != null) RingPainter.Bulbs((uint*)data.Scan0, full, decor, time);
+                ring.UnlockBits(data);
+                g.DrawImageUnscaled(ring, x, y);
             }
             g.SmoothingMode = SmoothingMode.AntiAlias;
             using (var win = Knit.RoundedRect(new RectangleF(x + band, y + band, ww, wh), radius))
                 g.FillPath(Brushes.WhiteSmoke, win);
-            g.DrawString(label, font, Brushes.White, x, y + outer.Height + 4 * scale);
+            g.DrawString(label, font, Brushes.White, x, y + oh + 4 * scale);
         }
         sheet.Save(path, ImageFormat.Png);
     }
