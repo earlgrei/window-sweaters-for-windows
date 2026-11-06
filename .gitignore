@@ -1,0 +1,10 @@
+bin/
+obj/
+publish/
+*.user
+.vs/
+
+# local release builds and archives (attach these to a GitHub Release instead)
+wSweaters/
+*.7z
+*.zip

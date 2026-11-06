@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <AssemblyName>WindowSweaters</AssemblyName>
+    <RootNamespace>WindowSweaters</RootNamespace>
+    <Product>Window Sweaters</Product>
+    <AssemblyTitle>Window Sweaters</AssemblyTitle>
+    <Description>Knitted borders for your windows.</Description>
+    <Version>1.5.0</Version>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <ApplicationIcon Condition="Exists('assets\app.ico')">assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+</Project>
