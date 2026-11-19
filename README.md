@@ -9,12 +9,12 @@ Sara Gordić: knitted borders for your windows, in colours inspired by your favo
 
 ## Run it
 
-Needs Windows 10 or 11 (x64). The small build needs the
-[.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0); the self-contained build doesn't.
+Runs on Windows 10 or 11 (x64) with nothing to install: the .NET runtime is built into the exe.
+Building it needs the [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0).
 
 ```powershell
-.\build.ps1                 # -> publish\WindowSweaters.exe (~300 KB)
-.\build.ps1 -SelfContained  # bundles .NET, runs anywhere
+.\build.ps1          # -> publish\WindowSweaters.exe (~100 MB, standalone; the one to share)
+.\build.ps1 -Small   # -> ~300 KB, but needs the .NET 9 Desktop Runtime installed
 ```
 
 Then run `publish\WindowSweaters.exe`. A yarn ball appears in the notification area (it may be
