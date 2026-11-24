@@ -118,6 +118,7 @@ Windows go without a sweater while maximized, full screen, minimized or on anoth
 ```powershell
 WindowSweaters.exe --swatch out.png [scale] [season] [seconds]   # render samples to a PNG
 WindowSweaters.exe --menu-test out.txt        # click through every menu style, dump the menu
+WindowSweaters.exe --menu-shot folder         # render the tray menu and submenus to PNGs
 WindowSweaters.exe --write-icon app.ico       # regenerate the icon
 ```
 

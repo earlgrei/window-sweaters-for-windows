@@ -102,6 +102,28 @@ internal sealed class TrayApp : ApplicationContext
         base.Dispose(disposing);
     }
 
+    /// Test hook: pretend these apps have windows, so the Apps submenu can be rendered.
+    internal IReadOnlyList<AppIdentity>? OwnersOverride;
+
+    /// Render the menu and each submenu to PNGs in `dir`, as they would appear on screen.
+    internal void MenuSnapshots(string dir)
+    {
+        BuildMenu();
+        Directory.CreateDirectory(dir);
+        void Shot(ToolStripDropDown menu, string name)
+        {
+            menu.Show(new Point(40, 40));
+            menu.Refresh();
+            using var bmp = new Bitmap(menu.Width, menu.Height);
+            menu.DrawToBitmap(bmp, new Rectangle(Point.Empty, menu.Size));
+            menu.Close();
+            bmp.Save(Path.Combine(dir, name + ".png"), System.Drawing.Imaging.ImageFormat.Png);
+        }
+        Shot(_menu, "menu");
+        foreach (var item in _menu.Items.OfType<ToolStripMenuItem>().Where(i => i.HasDropDownItems))
+            Shot(item.DropDown, item.Text!.Replace(' ', '-').ToLowerInvariant());
+    }
+
     ToolStripMenuItem Find(string text) => _menu.Items.OfType<ToolStripMenuItem>().First(i => i.Text == text);
 
     void OnDisplayChanged(object? sender, EventArgs e) => _tracker.RefreshAll();
@@ -191,6 +213,8 @@ internal sealed class TrayApp : ApplicationContext
     static ToolStripMenuItem Item(string text, bool check, Action click, string? tip = null, Image? image = null)
     {
         var item = new ToolStripMenuItem(text) { Checked = check, ToolTipText = tip, Image = image };
+        // Swatches are rendered at their exact device size; never rescale them to the menu's icon size.
+        if (image != null) item.ImageScaling = ToolStripItemImageScaling.None;
         item.Click += (_, _) => click();
         return item;
     }
@@ -212,7 +236,6 @@ internal sealed class TrayApp : ApplicationContext
         foreach (var old in previous) old.Dispose();
         var items = _menu.Items;
         int sw = _menu.LogicalToDeviceUnits(36), sh = _menu.LogicalToDeviceUnits(14);
-        _menu.ImageScalingSize = new Size(sw, sh);
 
         items.Add(Item("Show Sweater Borders", S.On, () => { S.On = !S.On; Changed(); }));
 
@@ -226,7 +249,8 @@ internal sealed class TrayApp : ApplicationContext
         foreach (var (kind, key, title, months) in Seasons.All)
         {
             bool on = S.FollowCalendar ? nowSeason == kind : Seasons.Chosen == kind;
-            string label = S.FollowCalendar && on ? title + "  (now)" : title;
+            // "&" marks a keyboard shortcut in menus; double it so "Twigs & Vines" shows its ampersand.
+            string label = (S.FollowCalendar && on ? title + "  (now)" : title).Replace("&", "&&");
             season.DropDownItems.Add(Item(label, on, () => { S.FollowCalendar = false; S.Season = key; Changed(); },
                 tip: "Worn " + months + " when following the calendar.", image: SeasonSwatch(kind, sw, sh)));
         }
@@ -238,7 +262,7 @@ internal sealed class TrayApp : ApplicationContext
 
         // Apps
         var apps = Submenu(items, "Apps");
-        var owners = _tracker.Owners();
+        var owners = OwnersOverride ?? _tracker.Owners();
         if (owners.Count == 0) apps.DropDownItems.Add(new ToolStripMenuItem("No Available Apps") { Enabled = false });
         foreach (var app in owners)
         {
@@ -345,6 +369,21 @@ internal sealed class TrayApp : ApplicationContext
 
         items.Add(new ToolStripSeparator());
         items.Add(Item("Quit Window Sweaters", false, Quit));
+        FitMargins(_menu);
+    }
+
+    /// Give every menu its own margins: checkmarks always get their own standard-size column,
+    /// and only menus that show pattern swatches get an image column (sized by the swatches,
+    /// which are not rescaled). Sharing one column at swatch size drew each checkmark stretched
+    /// into a wide box (issue #1).
+    static void FitMargins(ToolStripDropDownMenu menu)
+    {
+        int icon = menu.LogicalToDeviceUnits(16);
+        menu.ImageScalingSize = new Size(icon, icon);
+        menu.ShowCheckMargin = true;
+        menu.ShowImageMargin = menu.Items.OfType<ToolStripItem>().Any(i => i.Image != null);
+        foreach (var sub in menu.Items.OfType<ToolStripMenuItem>())
+            if (sub.HasDropDownItems && sub.DropDown is ToolStripDropDownMenu dropDown) FitMargins(dropDown);
     }
 
     static Image? SeasonSwatch(Season season, int w, int h)

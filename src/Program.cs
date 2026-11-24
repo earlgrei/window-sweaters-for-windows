@@ -43,6 +43,17 @@ internal static class Program
             return 0;
         }
 
+        if (args is ["--menu-shot", var shotDir, ..])
+        {
+            // Developer aid: render the tray menu and its submenus to PNGs, with sample apps.
+            ApplicationConfiguration.Initialize();
+            using var app = new TrayApp(live: false);
+            app.OwnersOverride = new[] { "Google Chrome", "Microsoft Word", "Notepad++", "Visual Studio Code", "Windows Explorer" }
+                .Select(n => new AppIdentity { Key = n.ToLowerInvariant(), Name = n, Names = [n] }).ToList();
+            app.MenuSnapshots(shotDir);
+            return 0;
+        }
+
         using var mutex = new Mutex(true, @"Local\WindowSweaters.SingleInstance", out bool first);
         if (!first) return 0;
 
