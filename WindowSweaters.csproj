@@ -13,7 +13,7 @@
     <Product>Window Sweaters</Product>
     <AssemblyTitle>Window Sweaters</AssemblyTitle>
     <Description>Knitted borders for your windows.</Description>
-    <Version>1.5.0</Version>
+    <Version>1.5.1</Version>
     <InvariantGlobalization>true</InvariantGlobalization>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <ApplicationIcon Condition="Exists('assets\app.ico')">assets\app.ico</ApplicationIcon>

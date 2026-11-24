@@ -9,7 +9,7 @@ internal static class Program
     {
         if (args is ["--version" or "-v", ..])
         {
-            Console.WriteLine("Window Sweaters for Windows 1.5.0");
+            Console.WriteLine("Window Sweaters for Windows 1.5.1");
             return 0;
         }
         if (args is ["--write-icon", var path, ..])
